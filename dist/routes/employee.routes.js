@@ -1,0 +1,15 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const auth_1 = require("../middleware/auth");
+const employee_controller_1 = require("../controllers/employee.controller");
+const router = (0, express_1.Router)();
+router.use(auth_1.authenticateToken);
+router.get('/', employee_controller_1.getAllEmployees);
+router.post('/', employee_controller_1.createEmployee);
+router.get('/:id/transactions', employee_controller_1.getEmployeeTransactions);
+router.post('/:id/transactions', employee_controller_1.addEmployeeTransaction);
+router.get('/:id/attendance', employee_controller_1.getEmployeeAttendance);
+router.post('/:id/attendance', employee_controller_1.recordAttendance);
+router.get('/:id/balance', employee_controller_1.getEmployeeCurrentBalance);
+exports.default = router;

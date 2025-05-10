@@ -2,6 +2,10 @@ import { Request, Response } from 'express';
 import pool from '../config/database';
 import { Employee, EmployeeTransaction, Attendance } from '../models/types';
 
+interface AuthRequest extends Request {
+    user?: { id: number; email: string };
+}
+
 export const getAllEmployees = async (req: Request, res: Response) => {
     try {
         const result = await pool.query(
@@ -44,14 +48,21 @@ export const getEmployeeTransactions = async (req: Request, res: Response) => {
     }
 };
 
-export const addEmployeeTransaction = async (req: Request, res: Response) => {
+export const addEmployeeTransaction = async (req: AuthRequest, res: Response) => {
     try {
         const employeeId = req.params.id;
+        //const userId = auth.user?.id;
+        console.log("request: ",req.body)
         const { type, amount, date, description }: EmployeeTransaction = req.body;
         
-        const result = await pool.query(
+       /** const result = await pool.query(
             'INSERT INTO employee_transactions (employee_id, type, amount, date, description) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-            [employeeId, type, amount, date, description]
+            [req.user?.id, type, amount, date, description]
+        );*/
+
+    const result = await pool.query(
+            'INSERT INTO transactions (user_id, transaction_type, amount, date, description, company_name,employee_id) VALUES ($1, $2, $3, $4, $5, $6,$7) RETURNING id',
+            [req.user?.id, type, amount, date, description, 'Employee Transaction',employeeId]
         );
         
         res.status(201).json(result.rows[0]);
