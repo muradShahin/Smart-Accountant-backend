@@ -8,11 +8,17 @@ export const register = async (req: Request, res: Response) => {
     try {
         const { name, email, password }: User = req.body;
         const hashedPassword = await bcrypt.hash(password, 10);
-        
+        console.log("regsiter", hashedPassword);
+
+
+
+
         const result = await pool.query(
             'INSERT INTO users (name, email, password_hash) VALUES ($1, $2, $3) RETURNING id, email',
             [name, email, hashedPassword]
         );
+
+        console.log("result", result);
 
         const token = jwt.sign(
             { id: result.rows[0].id, email: result.rows[0].email },
@@ -25,6 +31,7 @@ export const register = async (req: Request, res: Response) => {
         if (error.code === '23505') { // PostgreSQL unique violation error code
             return res.status(400).json({ message: 'Email already exists' });
         }
+        console.error('Error during registration:', error);
         res.status(500).json({ message: 'Error creating user' });
     }
 };

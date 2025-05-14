@@ -50,10 +50,17 @@ const getEmployeeTransactions = (req, res) => __awaiter(void 0, void 0, void 0, 
 });
 exports.getEmployeeTransactions = getEmployeeTransactions;
 const addEmployeeTransaction = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     try {
         const employeeId = req.params.id;
+        //const userId = auth.user?.id;
+        console.log("request: ", req.body);
         const { type, amount, date, description } = req.body;
-        const result = yield database_1.default.query('INSERT INTO employee_transactions (employee_id, type, amount, date, description) VALUES ($1, $2, $3, $4, $5) RETURNING *', [employeeId, type, amount, date, description]);
+        /** const result = await pool.query(
+             'INSERT INTO employee_transactions (employee_id, type, amount, date, description) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+             [req.user?.id, type, amount, date, description]
+         );*/
+        const result = yield database_1.default.query('INSERT INTO transactions (user_id, transaction_type, amount, date, description, company_name,employee_id) VALUES ($1, $2, $3, $4, $5, $6,$7) RETURNING id', [(_a = req.user) === null || _a === void 0 ? void 0 : _a.id, type, amount, date, description, 'Employee Transaction', employeeId]);
         res.status(201).json(result.rows[0]);
     }
     catch (error) {
