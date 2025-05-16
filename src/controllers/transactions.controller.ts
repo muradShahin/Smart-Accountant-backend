@@ -17,31 +17,118 @@ interface Transaction {
 export const getTransactions = async (req: AuthRequest, res: Response) => {
     try {
         const userId = req.user?.id;
-        const { startDate, endDate, type } = req.query;
+        if (!userId) {
+            return res.status(401).json({ message: 'Unauthorized' });
+        }
+
+        const page = Math.max(1, parseInt(req.query.page as string) || 1);
+        const limit = Math.max(1, Math.min(100, parseInt(req.query.limit as string) || 10));
+        const offset = (page - 1) * limit;
+
+        // Parse query parameters
+        const startDate = req.query.startDate as string;
+        const endDate = req.query.endDate as string;
+        const type = req.query.transaction_type as string;
+        const employeeId = req.query.employee_id ? parseInt(req.query.employee_id as string) : undefined;
         
-        let query = 'SELECT t.*, e.name as employee_name FROM transactions t LEFT JOIN employees e ON t.employee_id = e.id WHERE t.user_id = $1';
-        const params: any[] = [userId];
-        
+        // Build the base query parts
+        const selectClause = `
+            SELECT t.*, e.name as employee_name 
+            FROM transactions t 
+            LEFT JOIN employees e ON t.employee_id = e.id 
+            WHERE t.user_id = $1
+        `;
+
+        const countClause = `
+            SELECT COUNT(*) 
+            FROM transactions t 
+            WHERE t.user_id = $1
+        `;
+
+        const params: Array<string | number> = [userId];
+        let conditions: string[] = [];
+
+        // Add conditions based on filters
         if (startDate) {
-            query += ' AND t.date >= $' + (params.length + 1);
+            conditions.push(`t.date >= $${params.length + 1}`);
             params.push(startDate);
         }
         if (endDate) {
-            query += ' AND t.date <= $' + (params.length + 1);
+            conditions.push(`t.date <= $${params.length + 1}`);  // Fixed: Added $ before the parameter number
             params.push(endDate);
         }
         if (type) {
-            query += ' AND t.transaction_type = $' + (params.length + 1);
+            conditions.push(`t.transaction_type = $${params.length + 1}`);
             params.push(type);
         }
+        if (employeeId) {
+            conditions.push(`t.employee_id = $${params.length + 1}`);
+            params.push(employeeId);
+        }
+
+        // Combine conditions
+        const whereClause = conditions.length > 0 
+            ? ` AND ${conditions.join(' AND ')}` 
+            : '';
+
+        // Construct final queries
+        const dataQuery = `
+            ${selectClause}
+            ${whereClause}
+            ORDER BY t.date DESC 
+            LIMIT $${params.length + 1} 
+            OFFSET $${params.length + 2}
+        `;
+
+        const countQuery = `
+            ${countClause}
+            ${whereClause}
+        `;
+
+        // Add pagination parameters to the data query params
+        const queryParams = [...params, limit, offset];
+
+        // Execute both queries
+        console.log('Executing queries:', {
+            dataQuery,
+            countQuery,
+            queryParams,
+            conditions
+        });
         
-        query += ' ORDER BY t.date DESC';
-        
-        const result = await pool.query(query, params);
-        res.json(result.rows);
+        const [results, countResult] = await Promise.all([
+            pool.query(dataQuery, queryParams),
+            pool.query(countQuery, params)
+        ]);
+
+        const totalRecords = parseInt(countResult.rows[0].count);
+        const totalPages = Math.ceil(totalRecords / limit);
+
+        // Log for debugging
+        console.log('Query executed:', {
+            params: queryParams,
+            rowCount: results.rows.length,
+            totalRecords
+        });
+
+        res.json({
+            data: results.rows,
+            pagination: {
+                currentPage: page,
+                pageSize: limit,
+                totalPages,
+                totalRecords,
+                hasNextPage: page < totalPages,
+                hasPreviousPage: page > 1
+            }
+        });
+
     } catch (error) {
         console.error("Error fetching transactions:", error);
-        res.status(500).json({ message: 'Error fetching transactions' });
+        res.status(500).json({ 
+            message: 'Error fetching transactions',
+            error: process.env.NODE_ENV === 'development' ? (error as Error).message : undefined
+        });
     }
 };
 
